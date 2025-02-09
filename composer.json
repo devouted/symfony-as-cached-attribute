@@ -1,0 +1,29 @@
+{
+  "name": "devouted/symfony/as-cached-attribute",
+  "description": "About",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Devouted\\Symfony\\AsCachedAttribute\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Marcin Sadowski",
+      "email": "msdevouted@gmail.com"
+    }
+  ],
+  "minimum-stability": "stable",
+  "require": {
+    "php": "^8.1",
+    "symfony/http-foundation": "6.4.*",
+    "symfony/http-kernel": "6.4.*",
+    "symfony/cache": "6.4.*"
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-main": "1.0.x-dev"
+    }
+  }
+}
