@@ -1,5 +1,5 @@
 services:
-  Devouted\AsCachedAttribute\Listener\CacheResponseListener:
+  Devouted\AsCachedAttribute\Listener\CachedResponseListener:
     arguments: [ '@cache.app' ]
     tags:
       - { name: kernel.event_listener, event: kernel.controller_arguments }
