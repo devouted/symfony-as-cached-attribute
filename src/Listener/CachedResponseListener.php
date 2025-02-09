@@ -1,10 +1,10 @@
 <?php
 
-namespace Devouted\Symfony\AsCachedAttribute\Listener;
+namespace Devouted\AsCachedAttribute\Listener;
 
 
-use Devouted\Symfony\AsCachedAttribute\Attribute\AsCachedRequestParameter;
-use Devouted\Symfony\AsCachedAttribute\Attribute\AsCachedResponse;
+use Devouted\AsCachedAttribute\Attribute\AsCachedRequestParameter;
+use Devouted\AsCachedAttribute\Attribute\AsCachedResponse;
 use ReflectionMethod;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;

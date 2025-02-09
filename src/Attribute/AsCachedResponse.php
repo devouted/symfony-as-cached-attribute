@@ -1,6 +1,6 @@
 <?php
 
-namespace Devouted\Symfony\AsCachedAttribute\Attribute;
+namespace Devouted\AsCachedAttribute\Attribute;
 
 use Attribute;
 

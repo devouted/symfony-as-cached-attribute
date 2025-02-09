@@ -1,11 +1,11 @@
 {
-  "name": "devouted/symfony/as-cached-attribute",
+  "name": "devouted/symfony-as-cached-attribute",
   "description": "About",
   "type": "library",
   "license": "MIT",
   "autoload": {
     "psr-4": {
-      "Devouted\\Symfony\\AsCachedAttribute\\": "src/"
+      "Devouted\\AsCachedAttribute\\": "src/"
     }
   },
   "authors": [

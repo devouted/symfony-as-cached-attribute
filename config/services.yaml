@@ -1,6 +1,6 @@
 services:
-    App\Application\Shared\Listener\CachedResponseListener:
-        arguments: ['@cache.app']
-        tags:
-            - { name: kernel.event_listener, event: kernel.controller_arguments }
-            - { name: kernel.event_listener, event: kernel.response }
+  Devouted\AsCachedAttribute\Listener\CacheResponseListener:
+    arguments: [ '@cache.app' ]
+    tags:
+      - { name: kernel.event_listener, event: kernel.controller_arguments }
+      - { name: kernel.event_listener, event: kernel.response }
