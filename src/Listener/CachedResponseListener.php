@@ -42,12 +42,15 @@ class CachedResponseListener
 
             $request->attributes->set('_cache_key', $cacheKey);
 
-            $cachedResponse = $this->cache->get($cacheKey, fn() => null);
-            if ($cachedResponse instanceof Response) {
-
-                $cachedResponse->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_HIT);
-                //if cache is present, return cached response and bypass controller action execution
-                $event->setController(fn() => $cachedResponse);
+            $cacheItem = $this->cache->getItem($cacheKey);
+            if ($cacheItem->isHit()) {
+                $cachedResponse = $cacheItem->get();
+                if ($cachedResponse instanceof Response) {
+                    $cachedResponse->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_HIT);
+                    $event->setController(fn() => $cachedResponse);
+                }else{
+                    $this->cache->deleteItem($cacheKey);
+                }
             }
         }
     }
@@ -94,9 +97,8 @@ class CachedResponseListener
         $event->setResponse($response);
     }
 
-    private function generateCacheKey(Request $request, ControllerArgumentsEvent $event, array $cacheKeyParams): string
+    private function generateCacheKey(Request $request, ControllerArgumentsEvent $event, array $cacheKeyParams = []): string
     {
-        $cacheKeyParams   = [];
         $methodReflection = $this->resolveCallableForReflection($event->getController());
         foreach ($event->getNamedArguments() as $paramName => $arg) {
             //if param is type of DTO where we can chose parameters that need to be used for cache key
