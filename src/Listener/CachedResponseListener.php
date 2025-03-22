@@ -47,7 +47,8 @@ class CachedResponseListener
                 $cachedResponse = $cacheItem->get();
                 if ($cachedResponse instanceof Response) {
                     $cachedResponse->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_HIT);
-                    $event->setController(fn() => $cachedResponse);
+                    $cachedResponse->send();
+                    exit;
                 }else{
                     $this->cache->deleteItem($cacheKey);
                 }
