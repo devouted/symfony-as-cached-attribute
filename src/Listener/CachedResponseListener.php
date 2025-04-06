@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ControllerArgumentsEvent;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Contracts\Cache\CacheInterface;
+use Tests\Integration\Controller\CachedQueryDTO;
 
 class CachedResponseListener
 {
@@ -18,7 +19,9 @@ class CachedResponseListener
     const CACHE_HEADER_MISS = 'Miss';
     const CACHE_HEADER_HIT = 'Hit';
 
-    public function __construct(private CacheInterface $cache) {}
+    public function __construct(private CacheInterface $cache)
+    {
+    }
 
     public function onKernelControllerArguments(ControllerArgumentsEvent $event): void
     {
@@ -37,7 +40,7 @@ class CachedResponseListener
 
             $event->getRequest()->attributes->set('_cache', $cacheAttribute);
 
-            $request  = $event->getRequest();
+            $request = $event->getRequest();
             $cacheKey = $this->generateCacheKey($request, $event, $cacheAttribute->cacheKeyParams);
 
             $request->attributes->set('_cache_key', $cacheKey);
@@ -47,9 +50,8 @@ class CachedResponseListener
                 $cachedResponse = $cacheItem->get();
                 if ($cachedResponse instanceof Response) {
                     $cachedResponse->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_HIT);
-                    $cachedResponse->send();
-                    exit;
-                }else{
+                    $event->setController(fn() => $cachedResponse);
+                } else {
                     $this->cache->deleteItem($cacheKey);
                 }
             }
@@ -66,15 +68,14 @@ class CachedResponseListener
         }
 
         $response = $event->getResponse();
-
-        if ($response->getStatusCode() >= 400) {
+        if ($response->getStatusCode() >= 400 || $response->headers->get(self::CACHE_HEADER_STATE_NAME) === self::CACHE_HEADER_HIT) {
             return;
         }
 
         $response->setCache([
-            'max_age'  => $cacheAttribute->ttl,
+            'max_age' => $cacheAttribute->ttl,
             's_maxage' => $cacheAttribute->ttl,
-            'public'   => $cacheAttribute->isPublic,
+            'public' => $cacheAttribute->isPublic,
         ]);
 
         if ($cacheAttribute->etag) {
@@ -101,24 +102,28 @@ class CachedResponseListener
     private function generateCacheKey(Request $request, ControllerArgumentsEvent $event, array $cacheKeyParams = []): string
     {
         $methodReflection = $this->resolveCallableForReflection($event->getController());
-        foreach ($event->getNamedArguments() as $paramName => $arg) {
-            //if param is type of DTO where we can chose parameters that need to be used for cache key
+        foreach ($event->getArguments() as $paramName => $arg) {
+            //if param is type of DTO where we can choose parameters that need to be used for cache key
             if (is_object($arg)) {
                 $reflectionClass = new \ReflectionClass($arg);
-                foreach ($reflectionClass->getProperties() as $property) {
-                    $attributes = $property->getAttributes(AsCachedRequestParameter::class);
-                    if (!empty($attributes)) {
-                        $cacheKeyParams[$property->getName()] = $property->getValue($arg);
+                $constructor = $reflectionClass->getConstructor();
+                if ($constructor) {
+                    foreach ($constructor->getParameters() as $param) {
+                        $attributes = $param->getAttributes(AsCachedRequestParameter::class);
+                        if (!empty($attributes)) {
+                            $name = $param->getName();
+                            $cacheKeyParams[$name] = $arg->{$name};
+                        }
                     }
                 }
             }
-            //the param it self might have a AsCachedRequestParameter attribute
+        }
+        foreach ($event->getNamedArguments() as $paramName => $arg) {
             $attributes = (new \ReflectionParameter($methodReflection, $paramName))->getAttributes(AsCachedRequestParameter::class);
             if (!empty($attributes)) {
                 $cacheKeyParams[$paramName] = $arg;
             }
         }
-
         return 'cached_response_' . md5($request->getPathInfo() . serialize($cacheKeyParams));
     }
 
