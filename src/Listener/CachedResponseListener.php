@@ -109,6 +109,7 @@ class CachedResponseListener
                 foreach ($reflectionClass->getProperties() as $property) {
                     $attributes = $property->getAttributes(AsCachedRequestParameter::class);
                     if (!empty($attributes)) {
+                        $property->setAccessible(true);
                         $name = $property->getName();
                         $cacheKeyParams[$name] = $property->getValue($arg);
                     }
