@@ -18,7 +18,7 @@ class CachedResponseListener
     const CACHE_HEADER_MISS = 'Miss';
     const CACHE_HEADER_HIT = 'Hit';
 
-    public function __construct(private CacheInterface $cache)
+    public function __construct(private readonly CacheInterface $cache)
     {
     }
 
@@ -29,7 +29,6 @@ class CachedResponseListener
         if (is_string($controller) || is_object($controller) || is_array($controller)) {
 
             $reflectionMethod = new ReflectionMethod(...$this->resolveCallableForReflection($controller));
-
             $attributes = $reflectionMethod->getAttributes(AsCachedResponse::class);
             if (empty($attributes)) {
                 return;
@@ -48,8 +47,8 @@ class CachedResponseListener
             if ($cacheItem->isHit()) {
                 $cachedResponse = $cacheItem->get();
                 if ($cachedResponse instanceof Response) {
-                    $cachedResponse->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_HIT);
                     $event->setController(fn() => $cachedResponse);
+                    $event->stopPropagation();
                 } else {
                     $this->cache->deleteItem($cacheKey);
                 }
@@ -72,9 +71,9 @@ class CachedResponseListener
         }
 
         $response->setCache([
-            'max_age' => $cacheAttribute->ttl,
+            'max_age'  => $cacheAttribute->ttl,
             's_maxage' => $cacheAttribute->ttl,
-            'public' => $cacheAttribute->isPublic,
+            'public'   => $cacheAttribute->isPublic,
         ]);
 
         if ($cacheAttribute->etag) {
@@ -87,7 +86,7 @@ class CachedResponseListener
 
         $cacheKey = $request->attributes->get('_cache_key');
 
-        $response->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_MISS);
+        $response->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_HIT);
 
         $this->cache->get($cacheKey, function ($item) use ($response, $cacheAttribute) {
             $item->expiresAfter($cacheAttribute->ttl);
@@ -95,24 +94,23 @@ class CachedResponseListener
             return $response;
         });
 
+        $response->headers->set(self::CACHE_HEADER_STATE_NAME, self::CACHE_HEADER_MISS);
+
         $event->setResponse($response);
     }
 
     private function generateCacheKey(Request $request, ControllerArgumentsEvent $event, array $cacheKeyParams = []): string
     {
         $methodReflection = $this->resolveCallableForReflection($event->getController());
-        foreach ($event->getArguments() as $paramName => $arg) {
+        foreach ($event->getNamedArguments() as $paramName => $arg) {
             //if param is type of DTO where we can choose parameters that need to be used for cache key
             if (is_object($arg)) {
                 $reflectionClass = new \ReflectionClass($arg);
-                $constructor = $reflectionClass->getConstructor();
-                if ($constructor) {
-                    foreach ($constructor->getParameters() as $param) {
-                        $attributes = $param->getAttributes(AsCachedRequestParameter::class);
-                        if (!empty($attributes)) {
-                            $name = $param->getName();
-                            $cacheKeyParams[$name] = $arg->{$name};
-                        }
+                foreach ($reflectionClass->getProperties() as $property) {
+                    $attributes = $property->getAttributes(AsCachedRequestParameter::class);
+                    if (!empty($attributes)) {
+                        $name = $property->getName();
+                        $cacheKeyParams[$name] = $property->getValue($arg);
                     }
                 }
             }
