@@ -5,6 +5,7 @@ namespace Devouted\AsCachedAttribute\Listener;
 
 use Devouted\AsCachedAttribute\Attribute\AsCachedRequestParameter;
 use Devouted\AsCachedAttribute\Attribute\AsCachedResponse;
+use Psr\Log\LoggerInterface;
 use ReflectionMethod;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,7 +19,9 @@ class CachedResponseListener
     const CACHE_HEADER_MISS = 'Miss';
     const CACHE_HEADER_HIT = 'Hit';
 
-    public function __construct(private readonly CacheInterface $cache)
+    public function __construct(private readonly CacheInterface   $cache,
+                                private readonly ?LoggerInterface $logger,
+                                private bool                      $modifyResponseCacheHeaders = true)
     {
     }
 
@@ -42,17 +45,23 @@ class CachedResponseListener
             $cacheKey = $this->generateCacheKey($request, $event, $cacheAttribute->cacheKeyParams);
 
             $request->attributes->set('_cache_key', $cacheKey);
-
+            $state = "Miss";
             $cacheItem = $this->cache->getItem($cacheKey);
             if ($cacheItem->isHit()) {
+                $expires = $cacheItem->getMetadata()['expiry'] ?? null;
                 $cachedResponse = $cacheItem->get();
                 if ($cachedResponse instanceof Response) {
                     $event->setController(fn() => $cachedResponse);
                     $event->stopPropagation();
+                    if ($this->logger) {
+                        $expires = $expires - time();
+                    }
+                    $state = "Hit, expires in: " . $expires . " seconds";
                 } else {
                     $this->cache->deleteItem($cacheKey);
                 }
             }
+            $this->log("Cache " . $state);
         }
     }
 
@@ -69,19 +78,20 @@ class CachedResponseListener
         if ($response->getStatusCode() >= 400 || $response->headers->get(self::CACHE_HEADER_STATE_NAME) === self::CACHE_HEADER_HIT) {
             return;
         }
+        if ($this->modifyResponseCacheHeaders) {
+            $response->setCache([
+                'max_age'  => $cacheAttribute->ttl,
+                's_maxage' => $cacheAttribute->ttl,
+                'public'   => $cacheAttribute->isPublic,
+            ]);
 
-        $response->setCache([
-            'max_age'  => $cacheAttribute->ttl,
-            's_maxage' => $cacheAttribute->ttl,
-            'public'   => $cacheAttribute->isPublic,
-        ]);
+            if ($cacheAttribute->etag) {
+                $response->setEtag($cacheAttribute->etag);
+            }
 
-        if ($cacheAttribute->etag) {
-            $response->setEtag($cacheAttribute->etag);
-        }
-
-        if ($cacheAttribute->expires) {
-            $response->setExpires(new \DateTime($cacheAttribute->expires));
+            if ($cacheAttribute->expires) {
+                $response->setExpires(new \DateTime($cacheAttribute->expires));
+            }
         }
 
         $cacheKey = $request->attributes->get('_cache_key');
@@ -122,6 +132,7 @@ class CachedResponseListener
                 $cacheKeyParams[$paramName] = $arg;
             }
         }
+        $this->log("Cache key parameters: " . json_encode($cacheKeyParams));
         return 'cached_response_' . md5($request->getPathInfo() . serialize($cacheKeyParams));
     }
 
@@ -132,5 +143,10 @@ class CachedResponseListener
         }
 
         return [$controller, "__invoke"];
+    }
+
+    private function log(string $msg): void
+    {
+        $this->logger?->info(sprintf('[AsCachedResponse] %s', $msg));
     }
 }
