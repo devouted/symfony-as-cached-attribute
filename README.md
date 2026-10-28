@@ -2,6 +2,13 @@
 
 Symfony attribute-based HTTP response caching. Mark controller actions with `#[AsCachedResponse]` to automatically cache responses.
 
+## Requirements
+
+- PHP 8.2 – 8.5
+- Symfony 6.4, 7.x or 8.x (`symfony/http-kernel` and `symfony/http-foundation`)
+
+> Note: Symfony 8.x requires PHP 8.4 or higher. Composer resolves the appropriate Symfony version for your PHP runtime automatically.
+
 ## Installation
 
 ```sh

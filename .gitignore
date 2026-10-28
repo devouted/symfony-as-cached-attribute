@@ -3,4 +3,5 @@ composer.lock
 /vendor/
 /.idea/
 /tests/Integration/var/
+/tests/Integration/config/reference.php
 /.phpunit.result.cache
